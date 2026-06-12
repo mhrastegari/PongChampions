@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PongChampions.Api/PongChampions.Api.csproj" />
+  <Project Path="PongChampions.Data/PongChampions.Data.csproj" />
+</Solution>
