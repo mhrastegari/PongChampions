@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/SolutionItems/">
+    <File Path="docker-compose.yml" />
+    <File Path="global.json" />
+  </Folder>
   <Project Path="PongChampions.Api/PongChampions.Api.csproj" />
   <Project Path="PongChampions.Data/PongChampions.Data.csproj" />
 </Solution>

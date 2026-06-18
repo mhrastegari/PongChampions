@@ -6,9 +6,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+var connectionString =
+    $"Host=localhost;" +
+    $"Port=5432;" +
+    $"Database=pongchampions;" +
+    $"Username={Environment.GetEnvironmentVariable("POSTGRES_USER")};" +
+    $"Password={Environment.GetEnvironmentVariable("POSTGRES_PASSWORD")}";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+        builder.Configuration.GetConnectionString(connectionString)));
 
 var app = builder.Build();
 
