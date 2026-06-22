@@ -4,9 +4,9 @@ namespace PongChampions.Data.Entities;
 
 public class User : BaseEntity
 {
-    public string Username { get; set; } = null!;
-    public string PasswordHash { get; set; } = null!;
-    public string DisplayName { get; set; } = null!;
-    public string Country { get; set; } = null!;
+    public required string Username { get; set; }
+    public required string PasswordHash { get; set; }
+    public required string DisplayName { get; set; }
+    public string? Country { get; set; }
     public Role Role { get; set; } = Role.Player;
 }
