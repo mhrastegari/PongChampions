@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PongChampions.Api.Services;
 using PongChampions.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +17,8 @@ var connectionString =
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString(connectionString)));
+
+builder.Services.AddScoped<AuthService>();
 
 var app = builder.Build();
 
