@@ -1,6 +1,1 @@
-@PongChampions.Api_HostAddress = http://localhost:5051
-
-GET {{PongChampions.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
+@PongChampions.Api_HostAddress = https://localhost:7273

@@ -20,8 +20,8 @@ public class AuthController(AuthService authService) : ControllerBase
     {
         var result = await authService.LoginAsync(dto);
 
-        if (result is false) return Unauthorized();
+        if (result is null) return Unauthorized();
 
-        return Ok();
+        return Ok(result);
     }
 }
