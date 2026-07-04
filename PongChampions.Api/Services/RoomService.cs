@@ -46,10 +46,10 @@ public class RoomService(AppDbContext context)
             await context.Rooms.SingleOrDefaultAsync(r => r.Code == code);
 
         if (room is null) 
-            throw new Exception("Room not found!");
+            throw new InvalidOperationException("Room not found!");
 
         if (room.GuestPlayerId is not null) 
-            throw new Exception("The Room is full!");
+            throw new InvalidOperationException("The Room is full!");
 
         Player guestPlayer;
 
@@ -57,10 +57,10 @@ public class RoomService(AppDbContext context)
         {
             guestPlayer =
                 await context.Players.SingleOrDefaultAsync(p => p.UserId == userId.Value)
-                    ?? throw new Exception("Player not found!");
+                    ?? throw new InvalidOperationException("Player not found!");
 
             if (room.HostPlayerId == guestPlayer.Id)
-                throw new Exception("You cannot join your own room.");
+                throw new InvalidOperationException("You cannot join your own room.");
         }
         else
         {
@@ -79,6 +79,16 @@ public class RoomService(AppDbContext context)
         await context.SaveChangesAsync();
 
         return room.ToDto();
+    }
+
+    public async Task<RoomDto?> GetRoomAsync(string code)
+    {
+        var room = await context.Rooms.SingleOrDefaultAsync(r => r.Code == code);
+
+        if (room is null)
+            throw new InvalidOperationException("Room not found!");
+
+        return room?.ToDto();
     }
 
     private async Task<string> GenerateRoomCodeAsync()
