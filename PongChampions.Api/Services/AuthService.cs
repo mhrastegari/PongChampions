@@ -28,14 +28,12 @@ public class AuthService(
             Country = dto.Country,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = Role.Player,
-            CreatedAt = DateTime.UtcNow
         };
 
         var player = new Player
         {
             User = user,
             DisplayName = dto.DisplayName,
-            CreatedAt = DateTime.UtcNow
         };
 
         context.Users.Add(user);

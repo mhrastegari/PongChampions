@@ -27,6 +27,17 @@ public class RoomController(RoomService roomService) : ControllerBase
         }
     }
 
+    [HttpGet("{code}")]
+    public async Task<IActionResult> Get([FromRoute] string code)
+    {
+        var room = await roomService.GetRoomAsync(code);
+
+        if (room is null)
+            return NotFound();
+
+        return Ok(room);
+    }
+
     [HttpPost("{code}/join")]
     public async Task<IActionResult> Join([FromRoute] string code)
     {

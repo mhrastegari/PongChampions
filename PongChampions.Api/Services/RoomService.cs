@@ -12,16 +12,18 @@ public class RoomService(AppDbContext context)
     public async Task<RoomDto> CreateRoomAsync(Guid userId)
     {
         var hostPlayer =
-            await context.Players.FirstOrDefaultAsync(p => p.UserId == userId);
+            await context.Players.SingleOrDefaultAsync(p => p.UserId == userId);
 
-        if (hostPlayer is null) 
-            throw new Exception("Player not found!");
+        if (hostPlayer is null)
+            throw new InvalidOperationException("Player not found!");
 
-        var alreadyHosting =
-            await context.Rooms.AnyAsync(r => r.HostPlayerId == hostPlayer.Id && r.Status != RoomStatus.Finished);
+        var alreadyInActiveRoom =
+            await context.Rooms.AnyAsync(r =>
+                r.Status != RoomStatus.Finished &&
+                (r.HostPlayerId == hostPlayer.Id || r.GuestPlayerId == hostPlayer.Id));
 
-        if (alreadyHosting)
-            throw new Exception("You already have an active room.");
+        if (alreadyInActiveRoom)
+            throw new InvalidOperationException("You are already in an active room.");
 
         var code = await GenerateRoomCodeAsync();
 
@@ -29,8 +31,8 @@ public class RoomService(AppDbContext context)
         {
             Code = code,
             HostPlayerId = hostPlayer.Id,
+            HostPlayer = hostPlayer,
             Status = RoomStatus.WaitingForPlayers,
-            CreatedAt = DateTime.UtcNow,
         };
 
         context.Rooms.Add(room);
@@ -42,14 +44,20 @@ public class RoomService(AppDbContext context)
 
     public async Task<RoomDto> JoinRoomAsync(string code, Guid? userId)
     {
-        var room = 
-            await context.Rooms.SingleOrDefaultAsync(r => r.Code == code);
+        var room =
+            await context.Rooms
+                .Include(r => r.HostPlayer)
+                .Include(r => r.GuestPlayer)
+                .SingleOrDefaultAsync(r => r.Code == code);
 
-        if (room is null) 
+        if (room is null)
             throw new InvalidOperationException("Room not found!");
 
-        if (room.GuestPlayerId is not null) 
-            throw new InvalidOperationException("The Room is full!");
+        if (room.Status is not RoomStatus.WaitingForPlayers)
+            throw new InvalidOperationException("Room is not joinable.");
+
+        if (room.GuestPlayerId is not null)
+            throw new InvalidOperationException("The room is full.");
 
         Player guestPlayer;
 
@@ -61,19 +69,28 @@ public class RoomService(AppDbContext context)
 
             if (room.HostPlayerId == guestPlayer.Id)
                 throw new InvalidOperationException("You cannot join your own room.");
+
+            var alreadyInActiveRoom =
+                await context.Rooms.AnyAsync(r =>
+                    r.Id != room.Id &&
+                    r.Status != RoomStatus.Finished &&
+                    (r.HostPlayerId == guestPlayer.Id || r.GuestPlayerId == guestPlayer.Id));
+
+            if (alreadyInActiveRoom)
+                throw new InvalidOperationException("You are already in an active room.");
         }
         else
         {
             guestPlayer = new()
             {
                 DisplayName = "Guest",
-                CreatedAt = DateTime.UtcNow
             };
 
             context.Players.Add(guestPlayer);
         }
 
         room.GuestPlayerId = guestPlayer.Id;
+        room.GuestPlayer = guestPlayer;
         room.Status = RoomStatus.Ready;
 
         await context.SaveChangesAsync();
@@ -83,10 +100,11 @@ public class RoomService(AppDbContext context)
 
     public async Task<RoomDto?> GetRoomAsync(string code)
     {
-        var room = await context.Rooms.SingleOrDefaultAsync(r => r.Code == code);
-
-        if (room is null)
-            throw new InvalidOperationException("Room not found!");
+        var room =
+            await context.Rooms
+                .Include(r => r.HostPlayer)
+                .Include(r => r.GuestPlayer)
+                .SingleOrDefaultAsync(r => r.Code == code);
 
         return room?.ToDto();
     }
