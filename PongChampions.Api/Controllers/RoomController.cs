@@ -55,6 +55,42 @@ public class RoomController(RoomService roomService) : ControllerBase
         }
     }
 
+    [Authorize]
+    [HttpPost("{code}/start")]
+    public async Task<IActionResult> Start([FromRoute] string code)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+
+            var room = roomService.StartMatchAsync(code, userId);
+
+            return Ok(room);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [Authorize]
+    [HttpPost("{code}/close")]
+    public async Task<IActionResult> Close([FromRoute] string code)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+
+            var room = await roomService.CloseRoomAsync(code, userId);
+
+            return Ok(room);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     private Guid GetCurrentUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);

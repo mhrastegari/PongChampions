@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PongChampions.Api.Hubs;
 using PongChampions.Api.Services;
 using PongChampions.Data;
 using System.Text;
@@ -41,6 +42,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
+builder.Services.AddSignalR();
+
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<RoomService>();
 
@@ -53,10 +56,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseStaticFiles();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<RoomHub>("/hubs/rooms");
 
 app.Run();
