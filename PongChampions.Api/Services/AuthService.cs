@@ -12,7 +12,7 @@ namespace PongChampions.Api.Services;
 
 public class AuthService(
     AppDbContext context,
-    IConfiguration configuration)
+    IConfiguration configuration) : IAuthService
 {
     public async Task RegisterAsync(UserRegisterDto dto)
     {

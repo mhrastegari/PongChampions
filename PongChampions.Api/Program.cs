@@ -44,8 +44,8 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connect
 
 builder.Services.AddSignalR();
 
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<RoomService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IRoomService, RoomService>();
 
 var app = builder.Build();
 

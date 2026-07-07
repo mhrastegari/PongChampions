@@ -7,7 +7,7 @@ namespace PongChampions.Api.Controllers;
 
 [ApiController]
 [Route("api/rooms")]
-public class RoomController(RoomService roomService) : ControllerBase
+public class RoomController(IRoomService roomService) : ControllerBase
 {
     [Authorize]
     [HttpPost]
@@ -63,7 +63,7 @@ public class RoomController(RoomService roomService) : ControllerBase
         {
             var userId = GetCurrentUserId();
 
-            var room = roomService.StartMatchAsync(code, userId);
+            var room = await roomService.StartMatchAsync(code, userId);
 
             return Ok(room);
         }

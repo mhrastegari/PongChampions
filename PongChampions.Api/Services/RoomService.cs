@@ -11,7 +11,7 @@ namespace PongChampions.Api.Services;
 
 public class RoomService(
     AppDbContext context,
-    IHubContext<RoomHub> roomHub)
+    IHubContext<RoomHub> roomHub) : IRoomService
 {
     public async Task<RoomDto> CreateRoomAsync(Guid userId)
     {
@@ -44,6 +44,17 @@ public class RoomService(
         await context.SaveChangesAsync();
 
         return room.ToDto();
+    }
+
+    public async Task<RoomDto?> GetRoomAsync(string code)
+    {
+        var room =
+            await context.Rooms
+                .Include(r => r.HostPlayer)
+                .Include(r => r.GuestPlayer)
+                .SingleOrDefaultAsync(r => r.Code == code);
+
+        return room?.ToDto();
     }
 
     public async Task<RoomDto> JoinRoomAsync(string code, Guid? userId)
@@ -108,51 +119,6 @@ public class RoomService(
         return roomDto;
     }
 
-    public async Task<RoomDto?> GetRoomAsync(string code)
-    {
-        var room =
-            await context.Rooms
-                .Include(r => r.HostPlayer)
-                .Include(r => r.GuestPlayer)
-                .SingleOrDefaultAsync(r => r.Code == code);
-
-        return room?.ToDto();
-    }
-
-    public async Task<RoomDto> CloseRoomAsync(string code, Guid userId)
-    {
-        var room =
-            await context.Rooms
-                .Include(r => r.HostPlayer)
-                .Include(r => r.GuestPlayer)
-                .SingleOrDefaultAsync(r => r.Code == code);
-
-        if (room is null)
-            throw new InvalidOperationException("Room not found!");
-
-        if (room.Status == RoomStatus.Finished)
-            throw new InvalidOperationException("Room is already finished.");
-
-        var hostPlayer =
-            await context.Players.SingleOrDefaultAsync(p => p.UserId == userId)
-                ?? throw new InvalidOperationException("Player not found!");
-
-        if (room.HostPlayerId != hostPlayer.Id)
-            throw new InvalidOperationException("Only the host can close this room.");
-
-        room.Status = RoomStatus.Finished;
-
-        await context.SaveChangesAsync();
-
-        var roomDto = room.ToDto();
-
-        await roomHub.Clients
-            .Group(room.Code)
-            .SendAsync("RoomClosed", roomDto);
-
-        return roomDto;
-    }
-
     public async Task<RoomDto> StartMatchAsync(string code, Guid userId)
     {
         var room =
@@ -186,6 +152,40 @@ public class RoomService(
         await roomHub.Clients
             .Group(room.Code)
             .SendAsync("MatchStarted", roomDto);
+
+        return roomDto;
+    }
+
+    public async Task<RoomDto> CloseRoomAsync(string code, Guid userId)
+    {
+        var room =
+            await context.Rooms
+                .Include(r => r.HostPlayer)
+                .Include(r => r.GuestPlayer)
+                .SingleOrDefaultAsync(r => r.Code == code);
+
+        if (room is null)
+            throw new InvalidOperationException("Room not found!");
+
+        if (room.Status == RoomStatus.Finished)
+            throw new InvalidOperationException("Room is already finished.");
+
+        var hostPlayer =
+            await context.Players.SingleOrDefaultAsync(p => p.UserId == userId)
+                ?? throw new InvalidOperationException("Player not found!");
+
+        if (room.HostPlayerId != hostPlayer.Id)
+            throw new InvalidOperationException("Only the host can close this room.");
+
+        room.Status = RoomStatus.Finished;
+
+        await context.SaveChangesAsync();
+
+        var roomDto = room.ToDto();
+
+        await roomHub.Clients
+            .Group(room.Code)
+            .SendAsync("RoomClosed", roomDto);
 
         return roomDto;
     }
