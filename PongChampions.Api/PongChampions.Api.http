@@ -1,1 +1,59 @@
 @PongChampions.Api_HostAddress = https://localhost:7273
+
+###
+# Register
+POST {{PongChampions.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "Test@12345",
+  "displayName": "Test User",
+  "country": "NL"
+}
+
+###
+# Login
+POST {{PongChampions.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "Test@12345"
+}
+
+###
+# Paste token manually after login
+@token = PASTE_TOKEN_HERE
+
+###
+# Create Room
+POST {{PongChampions.Api_HostAddress}}/api/rooms
+Authorization: Bearer {{token}}
+
+###
+# Paste room code manually after creating a room
+@roomCode = PASTE_ROOM_CODE_HERE
+
+###
+# Get Room
+GET {{PongChampions.Api_HostAddress}}/api/rooms/{{roomCode}}
+
+###
+# Join Room as Anonymous
+POST {{PongChampions.Api_HostAddress}}/api/rooms/{{roomCode}}/join
+
+###
+# Join Room as Logged-in User
+POST {{PongChampions.Api_HostAddress}}/api/rooms/{{roomCode}}/join
+Authorization: Bearer {{token}}
+
+###
+# Start Match
+POST {{PongChampions.Api_HostAddress}}/api/rooms/{{roomCode}}/start
+Authorization: Bearer {{token}}
+
+###
+# Close Room
+POST {{PongChampions.Api_HostAddress}}/api/rooms/{{roomCode}}/close
+Authorization: Bearer {{token}}
