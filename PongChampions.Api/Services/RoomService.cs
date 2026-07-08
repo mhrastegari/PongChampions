@@ -11,7 +11,8 @@ namespace PongChampions.Api.Services;
 
 public class RoomService(
     AppDbContext context,
-    IHubContext<RoomHub> roomHub) : IRoomService
+    IHubContext<RoomHub> roomHub,
+    IGameSessionService gameSessionService) : IRoomService
 {
     public async Task<RoomDto> CreateRoomAsync(Guid userId)
     {
@@ -149,9 +150,15 @@ public class RoomService(
 
         var roomDto = room.ToDto();
 
+        var gameState = gameSessionService.CreateSession(room.Code);
+
         await roomHub.Clients
             .Group(room.Code)
             .SendAsync("MatchStarted", roomDto);
+
+        await roomHub.Clients
+            .Group(room.Code)
+            .SendAsync("GameStateUpdated", gameState);
 
         return roomDto;
     }
@@ -186,6 +193,8 @@ public class RoomService(
         await roomHub.Clients
             .Group(room.Code)
             .SendAsync("RoomClosed", roomDto);
+
+        gameSessionService.RemoveSession(room.Code);
 
         return roomDto;
     }

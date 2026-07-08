@@ -46,6 +46,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
+builder.Services.AddScoped<IGameSessionService, GameSessionService>();
 
 var app = builder.Build();
 
@@ -55,8 +56,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-app.UseStaticFiles();
 
 app.UseAuthentication();
 
