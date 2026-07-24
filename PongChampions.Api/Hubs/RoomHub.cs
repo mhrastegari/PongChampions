@@ -7,7 +7,7 @@ namespace PongChampions.Api.Hubs;
 
 public class RoomHub(
     AppDbContext context,
-    GameSessionService gameSessionService) : Hub
+    IGameSessionService gameSessionService) : Hub
 {
     public async Task JoinRoom(string code, Guid? playerId = null)
     {

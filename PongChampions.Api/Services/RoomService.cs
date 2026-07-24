@@ -114,7 +114,7 @@ public class RoomService(
         var roomDto = room.ToDto();
 
         await roomHub.Clients
-            .Groups(room.Code)
+            .Group(room.Code)
             .SendAsync("PlayerJoined", roomDto);
 
         return roomDto;
