@@ -14,5 +14,6 @@ public interface IGameSessionService
         Guid? guestPlayerId);
     void RemoveSession(string roomCode);
     void RemoveConnection(string connectionId);
+    IReadOnlyList<GameStateDto> TickAll();
     GameStateDto UpdatePaddle(string connectionId, string roomCode, double y);
 }

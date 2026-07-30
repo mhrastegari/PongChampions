@@ -77,6 +77,37 @@ public class GameSessionService : IGameSessionService
         connections.TryRemove(connectionId, out _);
     }
 
+    public void RemoveSession(string roomCode)
+    {
+        sessions.TryRemove(roomCode, out _);
+    }
+
+    public IReadOnlyList<GameStateDto> TickAll()
+    {
+        var updatedStates = new List<GameStateDto>();
+
+        foreach (var gameState in sessions.Values)
+        {
+            if (!gameState.IsRunning)
+                continue;
+
+            lock (gameState)
+            {
+                gameState.Ball.X += gameState.Ball.VelocityX;
+                gameState.Ball.Y += gameState.Ball.VelocityY;
+
+                if (gameState.Ball.Y <= 0 || gameState.Ball.Y >= 1)
+                {
+                    gameState.Ball.VelocityY *= -1;
+                }
+
+                updatedStates.Add(gameState);
+            }
+        }
+
+        return updatedStates;
+    }
+
     public GameStateDto UpdatePaddle(string connectionId, string roomCode, double y)
     {
         if (!connections.TryGetValue(connectionId, out var connection))
@@ -102,10 +133,5 @@ public class GameSessionService : IGameSessionService
         }
 
         return gameState;
-    }
-
-    public void RemoveSession(string roomCode)
-    {
-        sessions.TryRemove(roomCode, out _);
     }
 }
