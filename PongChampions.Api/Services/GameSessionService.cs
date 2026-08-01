@@ -6,6 +6,10 @@ namespace PongChampions.Api.Services;
 
 public class GameSessionService : IGameSessionService
 {
+    private const double HostPaddleX = 0.05;
+    private const double GuestPaddleX = 0.95;
+    private const double PaddleHalfHeight = 0.12;
+
     private readonly ConcurrentDictionary<string, GameStateDto> sessions = new();
 
     private readonly ConcurrentDictionary<string, PlayerConnection> connections = new();
@@ -82,32 +86,6 @@ public class GameSessionService : IGameSessionService
         sessions.TryRemove(roomCode, out _);
     }
 
-    public IReadOnlyList<GameStateDto> TickAll()
-    {
-        var updatedStates = new List<GameStateDto>();
-
-        foreach (var gameState in sessions.Values)
-        {
-            if (!gameState.IsRunning)
-                continue;
-
-            lock (gameState)
-            {
-                gameState.Ball.X += gameState.Ball.VelocityX;
-                gameState.Ball.Y += gameState.Ball.VelocityY;
-
-                if (gameState.Ball.Y <= 0 || gameState.Ball.Y >= 1)
-                {
-                    gameState.Ball.VelocityY *= -1;
-                }
-
-                updatedStates.Add(gameState);
-            }
-        }
-
-        return updatedStates;
-    }
-
     public GameStateDto UpdatePaddle(string connectionId, string roomCode, double y)
     {
         if (!connections.TryGetValue(connectionId, out var connection))
@@ -133,5 +111,95 @@ public class GameSessionService : IGameSessionService
         }
 
         return gameState;
+    }
+
+    public IReadOnlyList<GameStateDto> TickAll()
+    {
+        var updatedStates = new List<GameStateDto>();
+
+        foreach (var gameState in sessions.Values)
+        {
+            if (!gameState.IsRunning)
+                continue;
+
+            lock (gameState)
+            {
+                MoveBall(gameState);
+                BounceFromTopBottom(gameState);
+                HandlePaddleCollisionOrScore(gameState);
+
+                updatedStates.Add(gameState);
+            }
+        }
+
+        return updatedStates;
+    }
+
+    private static void MoveBall(GameStateDto gameState)
+    {
+        gameState.Ball.X += gameState.Ball.VelocityX;
+        gameState.Ball.Y += gameState.Ball.VelocityY;
+    }
+
+    private static void BounceFromTopBottom(GameStateDto gameState)
+    {
+        if (gameState.Ball.Y <= 0 || gameState.Ball.Y >= 1)
+        {
+            gameState.Ball.VelocityY *= -1;
+            gameState.Ball.Y = Math.Clamp(gameState.Ball.Y, 0, 1);
+        }
+    }
+
+    private static void HandlePaddleCollisionOrScore(GameStateDto gameState)
+    {
+        var ball = gameState.Ball;
+
+        if (ball.VelocityX < 0 && ball.X <= HostPaddleX)
+        {
+            if (IsPaddleHit(ball.Y, gameState.HostPaddle.Y))
+            {
+                ball.X = HostPaddleX;
+                ball.VelocityX = Math.Abs(ball.VelocityX);
+                return;
+            }
+
+            if (ball.X <= 0)
+            {
+                gameState.GuestScore++;
+                ResetBall(gameState, directionX: 1);
+            }
+
+            return;
+        }
+
+        if (ball.VelocityX > 0 && ball.X >= GuestPaddleX)
+        {
+            if (IsPaddleHit(ball.Y, gameState.GuestPaddle.Y))
+            {
+                ball.X = GuestPaddleX;
+                ball.VelocityX = -Math.Abs(ball.VelocityX);
+                return;
+            }
+
+            if (ball.X >= 1)
+            {
+                gameState.HostScore++;
+                ResetBall(gameState, directionX: -1);
+            }
+        }
+    }
+
+    private static bool IsPaddleHit(double ballY, double paddleY)
+    {
+        return Math.Abs(ballY - paddleY) <= PaddleHalfHeight;
+    }
+
+    private static void ResetBall(GameStateDto gameState, int directionX)
+    {
+        gameState.Ball.X = 0.5;
+        gameState.Ball.Y = 0.5;
+
+        gameState.Ball.VelocityX = 0.01 * directionX;
+        gameState.Ball.VelocityY = Random.Shared.NextDouble() > 0.5 ? 0.01 : -0.01;
     }
 }
