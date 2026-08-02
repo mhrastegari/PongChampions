@@ -13,4 +13,6 @@ public class RoomDto : BaseDto
     public string? GuestDisplayName { get; set; }
 
     public RoomStatus Status { get; set; }
+
+    public int? MaxScore { get; set; }
 }

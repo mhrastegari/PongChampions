@@ -10,4 +10,5 @@ public class Room : BaseEntity
     public Guid? GuestPlayerId { get; set; }
     public Player? GuestPlayer { get; set; }
     public RoomStatus Status { get; set; }
+    public int MaxScore { get; set; } = 5;
 }

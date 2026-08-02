@@ -15,5 +15,6 @@ public static class RoomMapping
         GuestPlayerId = room.GuestPlayerId,
         GuestDisplayName = room.GuestPlayer?.DisplayName,
         Status = room.Status,
+        MaxScore = room.MaxScore,
     };
 }
