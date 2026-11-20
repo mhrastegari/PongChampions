@@ -150,7 +150,7 @@ public class RoomService(
 
         var roomDto = room.ToDto();
 
-        var gameState = gameSessionService.CreateSession(room.Code);
+        var gameState = gameSessionService.CreateSession(room.Code, room.MaxScore);
 
         await roomHub.Clients
             .Group(room.Code)

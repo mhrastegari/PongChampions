@@ -46,6 +46,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
+builder.Services.AddScoped<IMatchService, MatchService>();
 builder.Services.AddSingleton<IGameSessionService, GameSessionService>();
 
 builder.Services.AddHostedService<GameBackgroundService>();

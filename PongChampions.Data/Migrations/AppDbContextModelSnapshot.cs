@@ -58,7 +58,8 @@ namespace PongChampions.Data.Migrations
 
                     b.HasIndex("Player2Id");
 
-                    b.HasIndex("RoomId");
+                    b.HasIndex("RoomId")
+                        .IsUnique();
 
                     b.HasIndex("WinnerPlayerId");
 

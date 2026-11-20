@@ -10,6 +10,7 @@ public class MatchConfiguration : IEntityTypeConfiguration<Match>
     {
         builder.Property(m => m.Player1Score).IsRequired();
         builder.Property(m => m.Player2Score).IsRequired();
+        builder.HasIndex(m => m.RoomId).IsUnique();
         builder.HasOne<Room>().WithMany().HasForeignKey(m => m.RoomId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Player>().WithMany().HasForeignKey(m => m.Player1Id).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Player>().WithMany().HasForeignKey(m => m.Player2Id).OnDelete(DeleteBehavior.Restrict);

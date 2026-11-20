@@ -13,4 +13,6 @@ public class GameStateDto
     public int GuestScore { get; set; }
 
     public bool IsRunning { get; set; }
+
+    public int TargetScore { get; set; }
 }

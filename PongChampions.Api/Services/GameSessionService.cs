@@ -19,7 +19,7 @@ public class GameSessionService : IGameSessionService
         Guid? PlayerId,
         GamePlayerSide? Side);
 
-    public GameStateDto CreateSession(string roomCode)
+    public GameStateDto CreateSession(string roomCode, int targetScore)
     {
         var gameState = new GameStateDto
         {
@@ -42,6 +42,7 @@ public class GameSessionService : IGameSessionService
             HostScore = 0,
             GuestScore = 0,
             IsRunning = true,
+            TargetScore = targetScore,
         };
 
         sessions[roomCode] = gameState;
@@ -127,6 +128,12 @@ public class GameSessionService : IGameSessionService
                 MoveBall(gameState);
                 BounceFromTopBottom(gameState);
                 HandlePaddleCollisionOrScore(gameState);
+
+                if (gameState.HostScore >= gameState.TargetScore ||
+                    gameState.GuestScore >= gameState.TargetScore)
+                {
+                    gameState.IsRunning = false;
+                }
 
                 updatedStates.Add(gameState);
             }

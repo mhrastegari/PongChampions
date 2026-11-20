@@ -4,7 +4,7 @@ namespace PongChampions.Api.Services;
 
 public interface IGameSessionService
 {
-    GameStateDto CreateSession(string roomCode);
+    GameStateDto CreateSession(string roomCode, int targetScore);
     GameStateDto? GetSession(string roomCode);
     void RegisterConnection(
         string connectionId,
