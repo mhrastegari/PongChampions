@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PongChampions.Api.Common;
 using PongChampions.Api.Common.Dtos.User;
 using PongChampions.Data;
 using PongChampions.Data.Entities;
@@ -16,10 +17,13 @@ public class AuthService(
 {
     public async Task RegisterAsync(UserRegisterDto dto)
     {
+        if (Encoding.UTF8.GetByteCount(dto.Password) > 72)
+            throw ApiException.Invalid("Password must not exceed 72 UTF-8 bytes.");
+
         var exists = await context.Users.AnyAsync(x => x.Username == dto.Username);
 
         if (exists)
-            throw new InvalidOperationException("Username already exists");
+            throw ApiException.Conflict("Username already exists.");
 
         var user = new User
         {
@@ -44,6 +48,9 @@ public class AuthService(
 
     public async Task<AuthResponseDto?> LoginAsync(UserLoginDto dto)
     {
+        if (Encoding.UTF8.GetByteCount(dto.Password) > 72)
+            return null;
+
         var user = await context.Users.FirstOrDefaultAsync(x => x.Username == dto.Username);
 
         if (user is null) return null;
