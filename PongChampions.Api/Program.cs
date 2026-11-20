@@ -83,6 +83,8 @@ builder.Services.AddScoped<IRoomService, RoomService>();
 
 builder.Services.AddScoped<IMatchService, MatchService>();
 
+builder.Services.AddScoped<RoomMaintenance>();
+
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddOptions<GameOptions>()
