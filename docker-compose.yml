@@ -1,4 +1,32 @@
 services:
+  api:
+    build: .
+    image: ${API_IMAGE:-pongchampions-api:local}
+    restart: unless-stopped
+    environment: &api-environment
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=pongchampions;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env to a random value of at least 32 bytes}
+      Jwt__Issuer: PongChampions
+      Jwt__Audience: PongChampions
+      Https__Redirect: "false"
+      Cors__AllowedOrigins__0: ${CLIENT_ORIGIN:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+
+  migrate:
+    build: .
+    image: ${API_IMAGE:-pongchampions-api:local}
+    command: ["--migrate-only"]
+    environment: *api-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:17
 
@@ -12,7 +40,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
     volumes:
       - postgres_data:/var/lib/postgresql/data

@@ -1,0 +1,11 @@
+**/bin
+**/obj
+**/TestResults
+.git
+.vs
+.env
+.env.*
+**/appsettings.Development.json
+**/secrets.json
+PongChampions.Tests
+**/*.http
