@@ -53,6 +53,16 @@ builder.Services.AddScoped<IRoomService, RoomService>();
 
 builder.Services.AddScoped<IMatchService, MatchService>();
 
+builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddOptions<GameOptions>()
+    .BindConfiguration("Game")
+    .Validate(
+        o => o.TickMilliseconds is >= 10 and <= 1000 && o.ReconnectGraceSeconds >= 5 &&
+            o.LobbyLifetimeMinutes >= 1,
+        "Game timing options are outside the supported range.")
+    .ValidateOnStart();
+
 builder.Services.AddSingleton<IGameSessionService, GameSessionService>();
 
 builder.Services.AddHostedService<GameBackgroundService>();
