@@ -11,7 +11,7 @@ public static class RoomMapping
         CreatedAt = room.CreatedAt,
         Code = room.Code,
         HostPlayerId = room.HostPlayerId,
-        HostDisplayName = room.HostPlayer.DisplayName,
+        HostDisplayName = room.HostPlayer.DisplayName ?? "Player",
         GuestPlayerId = room.GuestPlayerId,
         GuestDisplayName = room.GuestPlayer?.DisplayName,
         Status = room.Status,

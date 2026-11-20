@@ -5,5 +5,6 @@ public enum RoomStatus
     WaitingForPlayers,
     Ready,
     InGame,
-    Finished
+    Finished,
+    Cancelled
 }

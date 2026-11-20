@@ -1,109 +1,79 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PongChampions.Api.Common;
 using PongChampions.Api.Services;
-using System.Security.Claims;
 
 namespace PongChampions.Api.Controllers;
 
 [ApiController]
 [Route("api/rooms")]
-public class RoomController(IRoomService roomService) : ControllerBase
+public sealed class RoomController(IRoomService rooms) : ControllerBase
 {
-    [Authorize]
+    [Authorize(Policy = "RegisteredPlayer")]
     [HttpPost]
     public async Task<IActionResult> Create()
     {
-        try
-        {
-            var userId = GetCurrentUserId();
+        var userId = PlayerIdentity.RegisteredUserId(User);
 
-            var room = await roomService.CreateRoomAsync(userId);
+        var room = await rooms.CreateRoomAsync(userId);
 
-            return Ok(room);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        return Ok(room);
     }
 
     [HttpGet("{code}")]
-    public async Task<IActionResult> Get([FromRoute] string code)
+    public async Task<IActionResult> Get(string code)
     {
-        var room = await roomService.GetRoomAsync(code);
+        var room = await rooms.GetRoomAsync(code);
 
         if (room is null)
-            return NotFound();
+            throw ApiException.NotFound("Room not found.");
 
         return Ok(room);
     }
 
     [HttpPost("{code}/join")]
-    public async Task<IActionResult> Join([FromRoute] string code)
+    public async Task<IActionResult> Join(string code)
     {
-        try
-        {
-            var userId = TryGetCurrentUserId();
+        if (User.FindFirst("identity_kind")?.Value == "guest")
+            throw ApiException.Forbidden("Use your guest credential to reconnect through SignalR.");
 
-            var room = await roomService.JoinRoomAsync(code, userId);
-
-            return Ok(room);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-    [Authorize]
-    [HttpPost("{code}/start")]
-    public async Task<IActionResult> Start([FromRoute] string code)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-
-            var room = await roomService.StartMatchAsync(code, userId);
-
-            return Ok(room);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-    [Authorize]
-    [HttpPost("{code}/close")]
-    public async Task<IActionResult> Close([FromRoute] string code)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-
-            var room = await roomService.CloseRoomAsync(code, userId);
-
-            return Ok(room);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-    private Guid GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.Parse(userId!);
-    }
-
-    private Guid? TryGetCurrentUserId()
-    {
-        var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(value, out var userId)
-            ? userId
+        Guid? userId = User.Identity?.IsAuthenticated == true
+            ? PlayerIdentity.RegisteredUserId(User)
             : null;
+
+        var result = await rooms.JoinRoomAsync(code, userId);
+
+        return Ok(result);
+    }
+
+    [Authorize(Policy = "RegisteredPlayer")]
+    [HttpPost("{code}/start")]
+    public async Task<IActionResult> Start(string code)
+    {
+        var userId = PlayerIdentity.RegisteredUserId(User);
+
+        var room = await rooms.StartMatchAsync(code, userId);
+
+        return Ok(room);
+    }
+
+    [Authorize(Policy = "RegisteredPlayer")]
+    [HttpPost("{code}/close")]
+    public async Task<IActionResult> Close(string code)
+    {
+        var userId = PlayerIdentity.RegisteredUserId(User);
+
+        var room = await rooms.CloseRoomAsync(code, userId);
+
+        return Ok(room);
+    }
+
+    [Authorize]
+    [HttpPost("{code}/leave")]
+    public async Task<IActionResult> Leave(string code)
+    {
+        var room = await rooms.LeaveRoomAsync(code, User);
+
+        return Ok(room);
     }
 }
