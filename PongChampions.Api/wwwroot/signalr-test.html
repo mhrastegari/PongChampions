@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SignalR Room Test</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.45;
+            color: #1f2933;
+            background: #f5f7fa;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+        }
+
+        main {
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 18px;
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .panel {
+            background: #ffffff;
+            border: 1px solid #d9e2ec;
+            border-radius: 8px;
+            padding: 18px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) repeat(7, auto);
+            gap: 10px;
+            align-items: end;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input {
+            min-height: 22px;
+            padding: 8px 10px;
+            border: 1px solid #bcccdc;
+            border-radius: 6px;
+            font: inherit;
+        }
+
+        .token-field {
+            grid-column: 1 / -1;
+        }
+
+        button {
+            min-height: 22px;
+            padding: 8px 12px;
+            border: 1px solid #9fb3c8;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #102a43;
+            font: inherit;
+            white-space: nowrap;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+            button:hover:not(:disabled) {
+                background: #f0f4f8;
+            }
+
+            button:disabled {
+                cursor: not-allowed;
+                opacity: 0.55;
+            }
+
+        .primary {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+            .primary:hover:not(:disabled) {
+                background: #1d4ed8;
+            }
+
+        .status {
+            margin: 14px 0 0;
+            font-size: 14px;
+            color: #52606d;
+        }
+
+        .proof {
+            margin-top: 8px;
+            font-weight: 700;
+        }
+
+        .proof.pass {
+            color: #147d64;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin: 22px 0 8px;
+        }
+
+            .log-header h2 {
+                margin: 0;
+                font-size: 18px;
+            }
+
+        pre {
+            min-height: 360px;
+            max-height: 560px;
+            margin: 0;
+            padding: 14px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid #bcccdc;
+            border-radius: 8px;
+            background: #102a43;
+            color: #e6f6ff;
+            font: 13px/1.45 Consolas, "Courier New", monospace;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 16px;
+            }
+
+            .controls {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            label {
+                grid-column: 1 / -1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>SignalR Room Test</h1>
+
+        <section class="panel" aria-label="SignalR controls">
+            <div class="controls">
+                <label>
+                    Room code
+                    <input id="roomCode"
+                           type="text"
+                           autocomplete="off"
+                           placeholder="Enter room code" />
+                </label>
+                <label>
+                    Player ID (display only)
+                    <input id="playerId"
+                           type="text"
+                           autocomplete="off"
+                           placeholder="Filled after creating a room" readonly />
+                </label>
+                <button id="connectButton" class="primary" type="button">
+                    Connect
+                </button>
+                <button id="disconnectButton" type="button" disabled>
+                    Disconnect
+                </button>
+                <button id="joinButton" type="button" disabled>Join Room</button>
+                <button id="leaveButton" type="button" disabled>Leave Room</button>
+                <button id="createRoomButton" type="button">Create Room</button>
+                <button id="guestJoinButton" type="button">Guest Joins</button>
+                <button id="startButton" type="button" disabled>Start Match</button>
+                <button id="closeButton" type="button" disabled>Close Room</button>
+                <button id="clearButton" type="button">Clear Logs</button>
+                <label class="token-field">
+                    Connection token (account JWT or guest credential; blank for spectator)
+                    <input id="connectionToken" type="password" autocomplete="off" placeholder="Paste connection credential before connecting" />
+                </label>
+                <label class="token-field">
+                    Bearer token for Create/Start/Close
+                    <input id="authToken"
+                           type="password"
+                           autocomplete="off"
+                           placeholder="Paste JWT token" />
+                </label>
+                <label>
+                    Guest player ID
+                    <input id="guestPlayerId"
+                           type="text"
+                           autocomplete="off"
+                           placeholder="Filled by Guest Joins"
+                           readonly />
+                </label>
+                <label>
+                    Paddle Y
+                    <input id="paddleY"
+                           type="number"
+                           min="0"
+                           max="1"
+                           step="0.05"
+                           value="0.5" />
+                </label>
+                <button id="movePaddleButton" type="button" disabled>
+                    Move Paddle
+                </button>
+            </div>
+
+            <p id="status" class="status">Disconnected</p>
+            <p id="gameLoopStatus" class="status proof">Game loop proof: waiting for GameStateUpdated events.</p>
+        </section>
+
+        <div class="log-header">
+            <h2>Logs</h2>
+        </div>
+        <pre id="logs" aria-live="polite"></pre>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        const roomCodeInput = document.getElementById("roomCode");
+        const connectButton = document.getElementById("connectButton");
+        const disconnectButton = document.getElementById("disconnectButton");
+        const joinButton = document.getElementById("joinButton");
+        const leaveButton = document.getElementById("leaveButton");
+        const startButton = document.getElementById("startButton");
+        const closeButton = document.getElementById("closeButton");
+        const authTokenInput = document.getElementById("authToken");
+        const connectionTokenInput = document.getElementById("connectionToken");
+        const createRoomButton = document.getElementById("createRoomButton");
+        const guestJoinButton = document.getElementById("guestJoinButton");
+        const clearButton = document.getElementById("clearButton");
+        const statusText = document.getElementById("status");
+        const gameLoopStatus = document.getElementById("gameLoopStatus");
+        const logs = document.getElementById("logs");
+        const playerIdInput = document.getElementById("playerId");
+        const guestPlayerIdInput = document.getElementById("guestPlayerId");
+        const paddleYInput = document.getElementById("paddleY");
+        const movePaddleButton = document.getElementById("movePaddleButton");
+
+        let connection = null;
+        let gameStateUpdateCount = 0;
+        let previousBall = null;
+
+        function setStatus(text) {
+            statusText.textContent = text;
+        }
+
+        function setConnectedState(isConnected) {
+            connectButton.disabled = isConnected;
+            disconnectButton.disabled = !isConnected;
+            joinButton.disabled = !isConnected;
+            leaveButton.disabled = !isConnected;
+            startButton.disabled = !isConnected;
+            closeButton.disabled = !isConnected;
+            movePaddleButton.disabled = !isConnected;
+        }
+
+        function resetGameLoopProof() {
+            gameStateUpdateCount = 0;
+            previousBall = null;
+            gameLoopStatus.classList.remove("pass");
+            gameLoopStatus.textContent =
+                "Game loop proof: waiting for GameStateUpdated events.";
+        }
+
+        function updateGameLoopProof(payload) {
+            const state = payload && typeof payload === "object" ? payload : null;
+            const ball = state?.ball ?? state?.Ball;
+            const x = Number(ball?.x ?? ball?.X);
+            const y = Number(ball?.y ?? ball?.Y);
+
+            if (!Number.isFinite(x) || !Number.isFinite(y)) {
+                return;
+            }
+
+            gameStateUpdateCount += 1;
+
+            if (previousBall && (x !== previousBall.x || y !== previousBall.y)) {
+                gameLoopStatus.classList.add("pass");
+                gameLoopStatus.textContent =
+                    `Game loop proof: PASS — ball moved from (${previousBall.x.toFixed(2)}, ${previousBall.y.toFixed(2)}) to (${x.toFixed(2)}, ${y.toFixed(2)}) after ${gameStateUpdateCount} updates.`;
+            } else if (!previousBall) {
+                gameLoopStatus.textContent =
+                    `Game loop proof: received initial ball position (${x.toFixed(2)}, ${y.toFixed(2)}). Waiting for movement...`;
+            }
+
+            previousBall = { x, y };
+        }
+
+        function formatPayload(payload) {
+            if (payload === undefined) {
+                return "";
+            }
+
+            try {
+                return JSON.stringify(payload, null, 2);
+            } catch {
+                return String(payload);
+            }
+        }
+
+        function log(message, payload) {
+            const timestamp = new Date().toISOString();
+            const formattedPayload = formatPayload(payload);
+            const line = formattedPayload
+                ? `[${timestamp}] ${message}\n${formattedPayload}\n`
+                : `[${timestamp}] ${message}\n`;
+
+            logs.textContent += line + "\n";
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function getRoomCode() {
+            return roomCodeInput.value.trim();
+        }
+
+        function requireRoomCode() {
+            const code = getRoomCode();
+
+            if (!code) {
+                log("error: room code is required");
+                roomCodeInput.focus();
+                return null;
+            }
+
+            return code;
+        }
+
+        function getAuthToken() {
+            return authTokenInput.value.trim();
+        }
+
+        async function readResponse(response) {
+            const text = await response.text();
+
+            if (!text) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(text);
+            } catch {
+                return text;
+            }
+        }
+
+        function createConnection() {
+            if (window.location.protocol === "file:") {
+                throw new Error(
+                    "Open this page from the running API, for example http://localhost:5051/signalr-test.html or https://localhost:7273/signalr-test.html. Do not open the HTML file directly from disk.",
+                );
+            }
+
+            const nextConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/rooms", { accessTokenFactory: () => connectionTokenInput.value.trim() })
+                .withAutomaticReconnect()
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            nextConnection.on("JoinedRoom", (...args) => {
+                log("event: JoinedRoom", args.length === 1 ? args[0] : args);
+            });
+
+            nextConnection.on("LeftRoom", (...args) => {
+                log("event: LeftRoom", args.length === 1 ? args[0] : args);
+            });
+
+            nextConnection.on("PlayerJoined", (...args) => {
+                log("event: PlayerJoined", args.length === 1 ? args[0] : args);
+            });
+
+            nextConnection.on("RoomClosed", (...args) => {
+                log("event: RoomClosed", args.length === 1 ? args[0] : args);
+            });
+
+            nextConnection.on("MatchStarted", (...args) => {
+                resetGameLoopProof();
+                log("event: MatchStarted", args.length === 1 ? args[0] : args);
+            });
+
+            nextConnection.on("GameStateUpdated", (...args) => {
+                const payload = args.length === 1 ? args[0] : args;
+                updateGameLoopProof(payload);
+                log("event: GameStateUpdated", payload);
+            });
+            nextConnection.on("MatchFinished", payload => {
+                log("event: MatchFinished", payload);
+            });
+
+            nextConnection.on("PlayerLeft", payload => {
+                log("event: PlayerLeft", payload);
+            });
+
+            nextConnection.onreconnecting((error) => {
+                setStatus("Reconnecting...");
+                setConnectedState(false);
+                log("reconnecting", error ? { message: error.message } : undefined);
+            });
+
+            nextConnection.onreconnected((connectionId) => {
+                setStatus(`Connected (${connectionId || "no connection id"})`);
+                setConnectedState(true);
+                log("reconnected", { connectionId });
+                const code = getRoomCode();
+                if (code) {
+                    nextConnection.invoke("JoinRoom", code).catch(error => {
+                        log("error: rejoin failed", { message: error.message });
+                    });
+                }
+            });
+
+            nextConnection.onclose((error) => {
+                setStatus("Disconnected");
+                setConnectedState(false);
+                log("disconnected", error ? { message: error.message } : undefined);
+            });
+
+            return nextConnection;
+        }
+
+        connectButton.addEventListener("click", async () => {
+            try {
+                connection = createConnection();
+                await connection.start();
+                setStatus(
+                    `Connected (${connection.connectionId || "no connection id"})`,
+                );
+                setConnectedState(true);
+                log("connected", { connectionId: connection.connectionId });
+            } catch (error) {
+                setStatus("Disconnected");
+                setConnectedState(false);
+                log("error: connect failed", { message: error.message });
+            }
+        });
+
+        createRoomButton.addEventListener("click", async () => {
+            const token = getAuthToken();
+
+            if (!token) {
+                log("error: bearer token is required for Create");
+                authTokenInput.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/rooms", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                const payload = await readResponse(response);
+
+                if (!response.ok) {
+                    log("error: Create failed", {
+                        status: response.status,
+                        statusText: response.statusText,
+                        payload,
+                    });
+                    return;
+                }
+
+                roomCodeInput.value = payload.code || "";
+                connectionTokenInput.value = token;
+                playerIdInput.value = payload.hostPlayerId || "";
+                guestPlayerIdInput.value = "";
+                resetGameLoopProof();
+                log("called: Create Room", payload);
+            } catch (error) {
+                log("error: Create failed", { message: error.message });
+            }
+        });
+
+        guestJoinButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+
+            if (!code) {
+                return;
+            }
+
+            try {
+                // The endpoint intentionally supports an anonymous guest. Do not
+                // send the host token here or the host would try to join itself.
+                const response = await fetch(
+                    `/api/rooms/${encodeURIComponent(code)}/join`,
+                    { method: "POST" },
+                );
+                const payload = await readResponse(response);
+
+                if (!response.ok) {
+                    log("error: Guest join failed", {
+                        status: response.status,
+                        statusText: response.statusText,
+                        payload,
+                    });
+                    return;
+                }
+
+                guestPlayerIdInput.value = payload.room?.guestPlayerId || "";
+                if (payload.guestToken) {
+                    log("Guest credential issued. Paste it into the connection token field in a separate guest tab.");
+                    window.prompt("Guest credential (keep private; paste into a separate guest tab)", payload.guestToken);
+                }
+                log("called: Guest Joins", payload.room);
+            } catch (error) {
+                log("error: Guest join failed", { message: error.message });
+            }
+        });
+
+        disconnectButton.addEventListener("click", async () => {
+            if (!connection) {
+                return;
+            }
+
+            try {
+                await connection.stop();
+            } catch (error) {
+                log("error: disconnect failed", { message: error.message });
+            }
+        });
+
+        joinButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+
+            if (!code || !connection) {
+                return;
+            }
+
+            try {
+                await connection.invoke("JoinRoom", code);
+                log("called: JoinRoom", { code });
+            } catch (error) {
+                log("error: JoinRoom failed", { message: error.message });
+            }
+        });
+
+        leaveButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+
+            if (!code || !connection) {
+                return;
+            }
+
+            try {
+                await connection.invoke("LeaveRoom", code);
+                log("called: LeaveRoom", { code });
+            } catch (error) {
+                log("error: LeaveRoom failed", { message: error.message });
+            }
+        });
+
+        startButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+            const token = getAuthToken();
+
+            if (!code) {
+                return;
+            }
+
+            if (!token) {
+                log("error: bearer token is required for Start");
+                authTokenInput.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/rooms/${encodeURIComponent(code)}/start`,
+                    {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    },
+                );
+                const payload = await readResponse(response);
+
+                if (!response.ok) {
+                    log("error: Start failed", {
+                        status: response.status,
+                        statusText: response.statusText,
+                        payload,
+                    });
+                    return;
+                }
+
+                log("called: Start", payload);
+            } catch (error) {
+                log("error: Start failed", { message: error.message });
+            }
+        });
+
+        closeButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+            const token = getAuthToken();
+
+            if (!code) {
+                return;
+            }
+
+            if (!token) {
+                log("error: bearer token is required for Close");
+                authTokenInput.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/rooms/${encodeURIComponent(code)}/close`,
+                    {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    },
+                );
+                const payload = await readResponse(response);
+
+                if (!response.ok) {
+                    log("error: Close failed", {
+                        status: response.status,
+                        statusText: response.statusText,
+                        payload,
+                    });
+                    return;
+                }
+
+                log("called: Close", payload);
+            } catch (error) {
+                log("error: Close failed", { message: error.message });
+            }
+        });
+
+        movePaddleButton.addEventListener("click", async () => {
+            const code = requireRoomCode();
+
+            if (!code || !connection) {
+                return;
+            }
+
+            const y = Number(paddleYInput.value);
+
+            if (Number.isNaN(y)) {
+                log("error: Paddle Y must be a number");
+                return;
+            }
+
+            try {
+                await connection.invoke("MovePaddle", code, y);
+                log("called: MovePaddle", { code, y });
+            } catch (error) {
+                log("error: MovePaddle failed", { message: error.message });
+            }
+        });
+
+        clearButton.addEventListener("click", () => {
+            logs.textContent = "";
+        });
+
+        setConnectedState(false);
+
+        if (window.location.protocol === "file:") {
+            log("ready: open this page from the running API, not from disk", {
+                http: "http://localhost:5051/signalr-test.html",
+                https: "https://localhost:7273/signalr-test.html",
+            });
+        } else {
+            log("ready");
+        }
+    </script>
+</body>
+</html>
