@@ -5,4 +5,5 @@
   </Folder>
   <Project Path="PongChampions.Api/PongChampions.Api.csproj" />
   <Project Path="PongChampions.Data/PongChampions.Data.csproj" />
+  <Project Path="PongChampions.Tests/PongChampions.Tests.csproj" />
 </Solution>
