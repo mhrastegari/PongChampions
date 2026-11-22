@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 220 23% 97%;
+    --foreground: 230 25% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 25% 12%;
+    --primary: 158 80% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 93%;
+    --secondary-foreground: 230 25% 15%;
+    --muted: 220 16% 92%;
+    --muted-foreground: 226 10% 36%;
+    --accent: 220 18% 90%;
+    --accent-foreground: 230 25% 12%;
+    --destructive: 0 72% 44%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 70% 28%;
+    --border: 220 15% 85%;
+    --input: 220 14% 72%;
+    --ring: 158 80% 32%;
+
+    /* The court stays a dark "screen" in both themes. */
+    --court: 232 32% 10%;
+    --court-foreground: 220 30% 92%;
+    --host: 192 85% 36%;
+    --guest: 330 72% 45%;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --background: 232 28% 7%;
+    --foreground: 220 25% 95%;
+    --card: 232 24% 11%;
+    --card-foreground: 220 25% 95%;
+    --primary: 156 72% 48%;
+    --primary-foreground: 232 30% 8%;
+    --secondary: 232 18% 17%;
+    --secondary-foreground: 220 25% 95%;
+    --muted: 232 18% 15%;
+    --muted-foreground: 225 12% 68%;
+    --accent: 232 18% 19%;
+    --accent-foreground: 220 25% 96%;
+    --destructive: 0 80% 64%;
+    --destructive-foreground: 232 30% 8%;
+    --success: 152 65% 52%;
+    --border: 232 16% 21%;
+    --input: 232 16% 30%;
+    --ring: 156 72% 52%;
+
+    --court: 234 34% 5%;
+    --court-foreground: 220 30% 92%;
+    --host: 190 90% 58%;
+    --guest: 328 88% 68%;
+  }
+
+  html {
+    @apply bg-background text-foreground antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply min-h-dvh bg-background font-sans;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -50,6 +50,10 @@ Finished rooms have exactly one match with scores, winner and finish time. Cance
 
 HTTP errors use ProblemDetails: invalid input `400`, invalid/missing authentication `401`, insufficient permission `403`, missing room `404`, conflicting lifecycle operation/full room `409`, throttling `429`, unexpected failure `500`. Authentication endpoints have an additional IP rate limit; hub calls are limited per connection. Unexpected details are logged rather than returned.
 
+## Web client
+
+`PongChampions.Web` is the React client (Vite, TypeScript, Tailwind CSS). With the API running, `npm install` and `npm run dev` in that folder serve it at `http://localhost:3000`, proxying `/api` and `/hubs` to the API. See [PongChampions.Web/README.md](PongChampions.Web/README.md) for scripts, configuration and deployment. The `web` workflow formats, lints, tests and builds it.
+
 ## Verification and releases
 
 ```powershell
@@ -67,4 +71,4 @@ The separate manual `deploy` workflow uses the GitHub `production` environment. 
 
 Run **one API replica**. Active sessions live in memory. On graceful shutdown, completed states are flushed where possible and active games are cancelled. A restart cancels stale in-game rooms rather than inventing results. A crash before an unpersisted final state is saved can lose that result. Durable recovery and multiple replicas require additional storage/coordination and are outside this MVP. Database outages retry completion while the process remains alive; readiness reports database failure.
 
-Leaderboards, profiles, match-history APIs, matchmaking, Redis, admin tools, AI opponents and a React client are intentionally deferred by the roadmap.
+Leaderboards, profiles, match-history APIs, matchmaking, Redis, admin tools and AI opponents are intentionally deferred by the roadmap.
