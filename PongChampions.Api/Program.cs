@@ -35,7 +35,8 @@ builder.Services.AddOptions<GameOptions>()
     .Validate(
         options => options.TickMilliseconds is >= 10 and <= 1000 &&
             options.ReconnectGraceSeconds >= 5 &&
-            options.LobbyLifetimeMinutes >= 1,
+            options.LobbyLifetimeMinutes >= 1 &&
+            options.ServeDelayMilliseconds is >= 0 and <= 10000,
         "Game timing options are outside the supported range.")
     .ValidateOnStart();
 

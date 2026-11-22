@@ -5,13 +5,30 @@ using PongChampions.Api.Common.Enums;
 
 namespace PongChampions.Api.Services;
 
-public sealed class GameSessionService(
-    TimeProvider clock,
-    IOptions<GameOptions> options) : IGameSessionService
+public sealed class GameSessionService : IGameSessionService
 {
+    // Board coordinates are normalized to [0, 1] on both axes. Speeds are board units per second.
     private const double HostPaddleX = 0.05;
     private const double GuestPaddleX = 0.95;
     private const double PaddleHalfHeight = 0.12;
+    private const double BallRadius = 0.015;
+
+    private const double ServeSpeed = 0.45;
+    private const double MaxBallSpeed = 1.2;
+    private const double RallySpeedup = 1.07;
+
+    private const double MinServeAngle = Math.PI / 12;
+    private const double MaxServeAngle = Math.PI * 7 / 36;
+    private const double MaxBounceAngle = Math.PI * 5 / 18;
+
+    // Sub-step movement so a fast ball can never skip over a paddle or a wall.
+    private const double MaxStepDistance = 0.005;
+
+    private readonly TimeProvider clock;
+    private readonly IOptions<GameOptions> options;
+    private readonly Random random;
+    private readonly double tickSeconds;
+    private readonly int serveDelayTicks;
 
     private readonly object sync = new();
 
@@ -19,6 +36,22 @@ public sealed class GameSessionService(
 
     private readonly Dictionary<string, PlayerConnection> connections = new();
 
+    public GameSessionService(TimeProvider clock, IOptions<GameOptions> options)
+        : this(clock, options, Random.Shared)
+    {
+    }
+
+    public GameSessionService(TimeProvider clock, IOptions<GameOptions> options, Random random)
+    {
+        this.clock = clock;
+        this.options = options;
+        this.random = random;
+
+        var tickMilliseconds = options.Value.TickMilliseconds;
+
+        tickSeconds = tickMilliseconds / 1000.0;
+        serveDelayTicks = (int)Math.Ceiling((double)options.Value.ServeDelayMilliseconds / tickMilliseconds);
+    }
 
     private sealed class Session(
         GameStateDto gameState,
@@ -27,6 +60,11 @@ public sealed class GameSessionService(
         public GameStateDto State { get; } = gameState;
         public DateTimeOffset HostLastSeen { get; set; } = now;
         public DateTimeOffset GuestLastSeen { get; set; } = now;
+
+        // While positive, the ball waits at the center and the pending serve velocity is withheld.
+        public int ServeTicksRemaining { get; set; }
+        public double ServeVelocityX { get; set; }
+        public double ServeVelocityY { get; set; }
     }
 
     private sealed record PlayerConnection(
@@ -56,17 +94,13 @@ public sealed class GameSessionService(
                 GuestPaddle = new()
                 {
                     Y = 0.5
-                },
-                Ball = new()
-                {
-                    X = 0.5,
-                    Y = 0.5,
-                    VelocityX = 0.01,
-                    VelocityY = 0.01
                 }
             };
 
-            sessions.Add(roomCode, new Session(gameState, clock.GetUtcNow()));
+            var session = new Session(gameState, clock.GetUtcNow());
+
+            Serve(session, 1);
+            sessions.Add(roomCode, session);
 
             return Snapshot(gameState);
         }
@@ -198,28 +232,25 @@ public sealed class GameSessionService(
     {
         lock (sync)
         {
+            foreach (var connection in connections.Values)
+                Touch(connection.RoomCode, connection.Side);
+
             foreach (var session in sessions.Values)
             {
-                foreach (var connection in connections.Values
-                    .Where(c => c.RoomCode == session.State.RoomCode))
-                    Touch(connection.RoomCode, connection.Side);
-
-                var gameState = session.State;
-
-                if (!gameState.IsRunning)
+                if (!session.State.IsRunning)
                     continue;
 
-                var previousX = gameState.Ball.X;
-
-                MoveBall(gameState);
-                BounceFromTopBottom(gameState);
-                HandlePaddleCollisionOrScore(gameState, previousX);
-
-                if (gameState.HostScore >= gameState.TargetScore ||
-                    gameState.GuestScore >= gameState.TargetScore)
+                if (session.ServeTicksRemaining > 0)
                 {
-                    gameState.IsRunning = false;
+                    session.ServeTicksRemaining--;
+
+                    if (session.ServeTicksRemaining > 0)
+                        continue;
+
+                    Launch(session);
                 }
+
+                Simulate(session, tickSeconds);
             }
 
             // Retry completed states until the result has been durably persisted.
@@ -255,70 +286,143 @@ public sealed class GameSessionService(
             session.GuestLastSeen = clock.GetUtcNow();
     }
 
-    private static void MoveBall(GameStateDto gameState)
+    private void Simulate(Session session, double seconds)
     {
-        gameState.Ball.X += gameState.Ball.VelocityX;
-        gameState.Ball.Y += gameState.Ball.VelocityY;
-    }
+        var ball = session.State.Ball;
+        var distance = Speed(ball) * seconds;
+        var steps = Math.Max(1, (int)Math.Ceiling(distance / MaxStepDistance));
+        var step = seconds / steps;
 
-    private static void BounceFromTopBottom(GameStateDto gameState)
-    {
-        var ball = gameState.Ball;
-
-        if (ball.Y <= 0 || ball.Y >= 1)
+        for (var i = 0; i < steps; i++)
         {
-            ball.VelocityY = ball.Y <= 0
-                ? Math.Abs(ball.VelocityY)
-                : -Math.Abs(ball.VelocityY);
+            var previousX = ball.X;
+            var previousY = ball.Y;
 
-            ball.Y = Math.Clamp(ball.Y, 0, 1);
+            ball.X += ball.VelocityX * step;
+            ball.Y += ball.VelocityY * step;
+
+            BounceFromTopBottom(ball);
+
+            if (TryPaddleHit(ball, previousX, previousY, session.State.HostPaddle.Y, HostPaddleX + BallRadius, 1) ||
+                TryPaddleHit(ball, previousX, previousY, session.State.GuestPaddle.Y, GuestPaddleX - BallRadius, -1))
+                continue;
+
+            if (ball.X > 0 && ball.X < 1)
+                continue;
+
+            Score(session, ball.X <= 0 ? GamePlayerSide.Guest : GamePlayerSide.Host);
+
+            return;
         }
     }
 
-    private static void HandlePaddleCollisionOrScore(GameStateDto gameState, double previousX)
+    private static void BounceFromTopBottom(BallStateDto ball)
     {
-        var ball = gameState.Ball;
-
-        if (ball.VelocityX < 0 && previousX > HostPaddleX && ball.X <= HostPaddleX &&
-            IsPaddleHit(ball.Y, gameState.HostPaddle.Y))
+        // Reflect any overshoot so the ball keeps its full travel distance.
+        if (ball.Y < BallRadius)
         {
-            ball.X = HostPaddleX;
-            ball.VelocityX = Math.Abs(ball.VelocityX);
+            ball.Y = 2 * BallRadius - ball.Y;
+            ball.VelocityY = Math.Abs(ball.VelocityY);
         }
-        else if (ball.VelocityX > 0 && previousX < GuestPaddleX && ball.X >= GuestPaddleX &&
-            IsPaddleHit(ball.Y, gameState.GuestPaddle.Y))
+        else if (ball.Y > 1 - BallRadius)
         {
-            ball.X = GuestPaddleX;
-            ball.VelocityX = -Math.Abs(ball.VelocityX);
-        }
-
-        if (ball.X <= 0 || ball.X >= 1)
-        {
-            if (ball.X <= 0)
-                gameState.GuestScore++;
-            else
-                gameState.HostScore++;
-
-            var direction = ball.X <= 0 ? 1 : -1;
-
-            ResetBall(gameState, direction);
+            ball.Y = 2 * (1 - BallRadius) - ball.Y;
+            ball.VelocityY = -Math.Abs(ball.VelocityY);
         }
     }
 
-    private static bool IsPaddleHit(double ballY, double paddleY)
+    // contactX is where the ball center sits when its edge touches the paddle face.
+    // returnDirection is the horizontal direction the ball leaves the paddle in.
+    private static bool TryPaddleHit(
+        BallStateDto ball,
+        double previousX,
+        double previousY,
+        double paddleY,
+        double contactX,
+        int returnDirection)
     {
-        return Math.Abs(ballY - paddleY) <= PaddleHalfHeight;
+        var approaching = returnDirection > 0
+            ? ball.VelocityX < 0 && previousX > contactX && ball.X <= contactX
+            : ball.VelocityX > 0 && previousX < contactX && ball.X >= contactX;
+
+        if (!approaching)
+            return false;
+
+        var fraction = (previousX - contactX) / (previousX - ball.X);
+        var contactY = previousY + (ball.Y - previousY) * fraction;
+        var reach = PaddleHalfHeight + BallRadius;
+        var offset = (contactY - paddleY) / reach;
+
+        if (Math.Abs(offset) > 1)
+            return false;
+
+        // Edge hits leave at a steep angle; center hits return nearly flat.
+        var angle = offset * MaxBounceAngle;
+        var speed = Math.Min(Speed(ball) * RallySpeedup, MaxBallSpeed);
+
+        ball.X = contactX;
+        ball.Y = Math.Clamp(contactY, BallRadius, 1 - BallRadius);
+        ball.VelocityX = returnDirection * speed * Math.Cos(angle);
+        ball.VelocityY = speed * Math.Sin(angle);
+
+        return true;
     }
 
-    private static void ResetBall(GameStateDto gameState, int directionX)
+    private void Score(Session session, GamePlayerSide scorer)
     {
-        gameState.Ball = new()
+        var gameState = session.State;
+
+        if (scorer == GamePlayerSide.Host)
+            gameState.HostScore++;
+        else
+            gameState.GuestScore++;
+
+        if (gameState.HostScore >= gameState.TargetScore ||
+            gameState.GuestScore >= gameState.TargetScore)
+        {
+            gameState.IsRunning = false;
+            gameState.Ball = new()
+            {
+                X = 0.5,
+                Y = 0.5
+            };
+
+            return;
+        }
+
+        // Serve away from the player who conceded so they have time to recover.
+        Serve(session, scorer == GamePlayerSide.Host ? -1 : 1);
+    }
+
+    private void Serve(Session session, int directionX)
+    {
+        var angle = MinServeAngle + random.NextDouble() * (MaxServeAngle - MinServeAngle);
+
+        if (random.NextDouble() < 0.5)
+            angle = -angle;
+
+        session.State.Ball = new()
         {
             X = 0.5,
-            Y = 0.5,
-            VelocityX = directionX * 0.01,
-            VelocityY = 0.01
+            Y = 0.5
         };
+        session.ServeVelocityX = directionX * ServeSpeed * Math.Cos(angle);
+        session.ServeVelocityY = ServeSpeed * Math.Sin(angle);
+        session.ServeTicksRemaining = serveDelayTicks;
+
+        if (serveDelayTicks == 0)
+            Launch(session);
+    }
+
+    private static void Launch(Session session)
+    {
+        session.State.Ball.VelocityX = session.ServeVelocityX;
+        session.State.Ball.VelocityY = session.ServeVelocityY;
+    }
+
+    private static double Speed(BallStateDto ball)
+    {
+        return Math.Sqrt(ball.VelocityX * ball.VelocityX + ball.VelocityY * ball.VelocityY);
     }
 
     private static GameStateDto Snapshot(GameStateDto gameState)
